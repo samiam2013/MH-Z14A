@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/tarm/serial"
 )
 
@@ -17,29 +17,29 @@ func main() {
 
 	stream, err := serial.OpenPort(config)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	defer stream.Close()
 
 	for {
 		// send the 'gas concentration' command to get the current reading
-		_, err := stream.Write([]byte{0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79})
-		if err != nil {
-			log.Fatal(err)
+		if _, err := stream.Write([]byte{0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79}); err != nil {
+			logrus.WithError(err).Warn("Failed writing command.")
+			continue
 		}
-		b := make([]byte, 9)
-		_, err = stream.Read(b)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if !checksumValidate(b) {
-			log.Print("checksum error")
+		response := make([]byte, 9)
+		if _, err = stream.Read(response); err != nil {
+			logrus.WithError(err).Warn("Failed reading response.")
 			continue
 		}
 
-		ppm := int(b[2])*256 + int(b[3])
-		log.Println("reported concentration: ", ppm, "ppm")
+		if !checksumValidate(response) {
+			logrus.Warn("Checksum validation error.")
+			continue
+		}
+
+		ppm := int(response[2])*256 + int(response[3])
+		logrus.Info("Reported concentration:", ppm, "ppm.")
 
 		time.Sleep(1 * time.Second)
 	}
