@@ -1,16 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/tarm/serial"
 )
 
 func main() {
 	config := &serial.Config{
-		Name:        "/dev/ttyAMA0",
+		Name:        "/dev/serial0",
 		Baud:        9600,
 		ReadTimeout: 1,
 		Size:        8,
@@ -20,13 +20,25 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer stream.Close()
 
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		fmt.Println(scanner.Text()) // Println will add back the final '\n'
-	}
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+	for {
+		_, err := stream.Write([]byte{0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79})
+		if err != nil {
+			log.Fatal(err)
+		}
+		b := make([]byte, 9)
+		_, err = stream.Read(b)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		upperB := b[2]
+		lowerB := b[3]
+		ppm := int(upperB)*256 + int(lowerB)
+		fmt.Println("reported concentration: ", ppm, "ppm")
+
+		time.Sleep(1 * time.Second)
 	}
 
 }
